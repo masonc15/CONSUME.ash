@@ -965,7 +965,13 @@ void handle_organ_expanders(Diet d, OrganSpace space, OrganSpace max, boolean ni
 	d.handle_stomache_expander(space, max, $item[sweet tooth], 1);
 	d.handle_stomache_expander(space, max, $item[distention pill], 1);
 
-	if(nightcap && have_familiar($familiar[stooper]) && my_familiar() != $familiar[stooper])
+	// Under SOME PIGS familiars grant no modifiers (mafia suppresses them all,
+	// including the Stooper's Liver Capacity +1), so equipping the Stooper will
+	// not raise inebriety_limit(). Crediting the phantom +1 anyway makes the
+	// 1-drunk "filler" drink consume the day's only overdrink, and mafia then
+	// refuses the real nightcap with "limited to 0 by inebriety".
+	if(nightcap && have_familiar($familiar[stooper]) && my_familiar() != $familiar[stooper] &&
+		have_effect($effect[SOME PIGS]) == 0)
 	{
 		DietAction useStooper;
 		useStooper.organ = ORGAN_STOOPER;
