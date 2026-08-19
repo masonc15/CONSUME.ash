@@ -965,11 +965,15 @@ void handle_organ_expanders(Diet d, OrganSpace space, OrganSpace max, boolean ni
 	d.handle_stomache_expander(space, max, $item[sweet tooth], 1);
 	d.handle_stomache_expander(space, max, $item[distention pill], 1);
 
-	// Under SOME PIGS familiars grant no modifiers (mafia suppresses them all,
-	// including the Stooper's Liver Capacity +1), so equipping the Stooper will
-	// not raise inebriety_limit(). Crediting the phantom +1 anyway makes the
-	// 1-drunk "filler" drink consume the day's only overdrink, and mafia then
-	// refuses the real nightcap with "limited to 0 by inebriety".
+	// Mafia suppresses ALL familiar modifiers under SOME PIGS, including the
+	// Stooper's Liver Capacity +1, so inebriety_limit() will not rise when the
+	// Stooper is equipped. The game itself DOES still honor the +1 (spaded
+	// 2026-08-19: charpane showed 30/20 with Stooper + SOME PIGS), so this is
+	// arguably a mafia bug -- but mafia is the gatekeeper that executes the
+	// drinks, and crediting a +1 that mafia won't recognize makes the 1-drunk
+	// "filler" consume the day's only overdrink, after which mafia refuses the
+	// real nightcap with "limited to 0 by inebriety". Match mafia's model; drop
+	// this guard if mafia ever exempts Liver Capacity from SOME PIGS.
 	if(nightcap && have_familiar($familiar[stooper]) && my_familiar() != $familiar[stooper] &&
 		have_effect($effect[SOME PIGS]) == 0)
 	{
