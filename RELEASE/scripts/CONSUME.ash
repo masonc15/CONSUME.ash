@@ -11,6 +11,56 @@ boolean havePinkyRing = available_amount($item[mafia pinky ring]) > 0;
 boolean haveTuxedoShirt = available_amount($item[tuxedo shirt]) > 0;
 int songDuration = my_accordion_buff_duration();
 
+boolean shrug_for_ode_enabled()
+{
+	string setting = get_property("CONSUME.SHRUGFORODE");
+	return setting == "" || setting.to_boolean();
+}
+
+int song_limit()
+{
+	return 3 + numeric_modifier("Additional Song").to_int();
+}
+
+int active_song_count()
+{
+	int count = 0;
+	foreach eff in my_effects()
+		if(eff.attributes.contains_text("song"))
+			count = count + 1;
+	return count;
+}
+
+// Whichever song has the fewest turns left, so we throw away the least.
+effect song_to_shrug()
+{
+	effect worst;
+	int worstTurns = 0;
+	foreach eff, turns in my_effects()
+	{
+		if(eff == $effect[Ode to Booze] || !eff.attributes.contains_text("song"))
+			continue;
+		if(worst == $effect[none] || turns < worstTurns)
+		{
+			worst = eff;
+			worstTurns = turns;
+		}
+	}
+	return worst;
+}
+
+// Ode is itself a song, so knowing the skill is not enough - every slot can
+// already be full, in which case the cast silently fails and the diet is
+// valued as though it had worked.
+boolean can_get_ode()
+{
+	if(!have_skill($skill[The Ode to Booze]) || songDuration <= 0)
+		return false;
+	if(have_effect($effect[Ode to Booze]) > 0 || active_song_count() < song_limit())
+		return true;
+	return shrug_for_ode_enabled() && song_to_shrug() != $effect[none];
+}
+
 boolean firstPassComplete = false;
 boolean consumablesEvaluated = false;
 
@@ -45,7 +95,7 @@ Range get_adventures(DietAction da)
 			advs.multiply_round_nearest(1.125);
 		if(haveTuxedoShirt && da.it.is_martini())
 			advs.add(new Range(1, 3));
-		if(have_skill($skill[The Ode to Booze]) && songDuration > 0)
+		if(can_get_ode())
 			advs.add(da.space);
 	}
 
@@ -1039,7 +1089,7 @@ Diet get_diet(OrganSpace space, OrganSpace max, boolean nightcap)
 			d.insert_action(milk, 0);
 		}
 	}
-	if(have_skill($skill[The Ode to Booze]) && songDuration > 0)
+	if(can_get_ode())
 	{
 		DietAction ode;
 		ode.sk = $skill[The Ode to Booze];
@@ -1048,6 +1098,15 @@ Diet get_diet(OrganSpace space, OrganSpace max, boolean nightcap)
 		int casts = ceil(to_float(turnsNeeded) / songDuration);
 		for(int i = 0; i < casts; ++i)
 			d.insert_action(ode, 0);
+		// Inserted at 0 so it lands ahead of the casts queued above.
+		if(casts > 0 && have_effect($effect[Ode to Booze]) <= 0 &&
+			active_song_count() >= song_limit() && song_to_shrug() != $effect[none])
+		{
+			DietAction shrugForOde;
+			shrugForOde.organ = ORGAN_SHRUG;
+			shrugForOde.shrug = song_to_shrug();
+			d.insert_action(shrugForOde, 0);
+		}
 	}
 
 	// go through your spleen actions from the end and replace with
@@ -1428,6 +1487,11 @@ void main(string command)
 					"probably bump in to autoBuyPriceLimit.");
 				print("CONSUME.ALLOWLIFETIMELIMITED - If set to true, will act like ALLOWLIFETIMELIMITED" +
 					"was passed as an argument every time.");
+				print("CONSUME.SHRUGFORODE - Defaults to true. The Ode to Booze is an Accordion Thief " +
+					"song, so it cannot be cast when all song slots are full (buffbots will do this to " +
+					"you). When true, CONSUME shrugs the song with the fewest turns remaining to make " +
+					"room. Set to false to leave your songs alone, in which case Ode's bonus is no " +
+					"longer counted toward the projected adventure yield.");
 				return;
 			default:
 				print('Unknown command "' + commands[i] + '"', "red");
